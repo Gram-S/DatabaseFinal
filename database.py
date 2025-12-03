@@ -76,6 +76,27 @@ def insert_ptm(ptm: str):
     with engine.begin() as conn:
         df = pd.read_sql(text(sql), conn, params={"n": ptm})
     return df.iloc[0].to_dict() if not df.empty else None
+
+def update_ptm(current: str, new: str):
+    sql = '''
+        UPDATE ptms
+        SET ptm = :n
+        WHERE ptm = :c
+        RETURNING ptm AS ptm
+    '''
+    with engine.begin() as conn:
+        df = pd.read_sql(text(sql), conn, params={"c": current, "n": new})
+    return df.iloc[0].to_dict() if not df.empty else None
+    
+def delete_ptm(mid: str):
+    sql = '''
+        DELETE FROM ptms
+        WHERE ptm = :mid
+        RETURNING ptm AS ptm
+    '''
+    with engine.begin() as conn:
+        df = pd.read_sql(text(sql), conn, params={"mid": str(mid)})
+    return df.iloc[0].to_dict() if not df.empty else None
     
 def insert_drug(drug: str):
     sql = '''
@@ -85,6 +106,27 @@ def insert_drug(drug: str):
     '''
     with engine.begin() as conn:
         df = pd.read_sql(text(sql), conn, params={"n": drug})
+    return df.iloc[0].to_dict() if not df.empty else None
+
+def update_drug(current: str, new: str):
+    sql = '''
+        UPDATE drugs
+        SET drug = :n
+        WHERE drug = :c
+        RETURNING drug AS drug
+    '''
+    with engine.begin() as conn:
+        df = pd.read_sql(text(sql), conn, params={"c": current, "n": new})
+    return df.iloc[0].to_dict() if not df.empty else None
+    
+def delete_drug(mid: str):
+    sql = '''
+        DELETE FROM drugs
+        WHERE drug = :mid
+        RETURNING drug AS drug
+    '''
+    with engine.begin() as conn:
+        df = pd.read_sql(text(sql), conn, params={"mid": str(mid)})
     return df.iloc[0].to_dict() if not df.empty else None
 
 # --------------- UI ---------------
@@ -116,8 +158,51 @@ with tab1:
                 if rec:
                     st.session_state.just_inserted = rec
                     st.rerun()
-                    
+    
+    ptms = fetch_df('SELECT ptm FROM ptms')
+           
     # Update a ptm
+    st.markdown("### ✏️ Update")
+    if ptms.empty:
+        st.caption("Nothing to update.")
+    else:
+        ptm_choices = {str(r.ptm): f"{str(r.ptm)}" for _, r in ptms.iterrows()}
+        sel_id = st.selectbox("ptm", options=list(ptm_choices.keys()), format_func=lambda k: ptm_choices[k], key="upd_sel")
+        current = ptms[ptms["ptm"] == sel_id].iloc[0]
+
+        with st.form("update_form", clear_on_submit=False):
+            c1, c2 = st.columns(2)
+            with c1:
+                new_name = st.text_input("ptm", current["ptm"])
+                
+            if st.form_submit_button("Update"):
+                rec = update_ptm(str(current["ptm"]), str(new_name))
+                if rec:
+                    st.session_state.just_updated = rec
+                    st.rerun()
+     
+    # Delete a ptm
+    st.markdown("### 🗑️ Delete")
+    if ptms.empty:
+        st.caption("Nothing to delete.")
+    else:
+        ptm_choices = {str(r.ptm): f"{str(r.ptm)}" for _, r in ptms.iterrows()}
+        colA, colB = st.columns([3, 2])
+        with colA:
+            del_id = st.selectbox("Select ptm", options=list(ptm_choices.keys()),
+                                  format_func=lambda k: ptm_choices[k], key="del_sel")
+        with colB:
+            confirm = st.checkbox("Confirm deletion", key="del_confirm")
+
+        if st.button("Delete selected"):
+            if not confirm:
+                st.warning("Please confirm before deleting.")
+            else:
+                rec = delete_ptm(str(del_id))
+                if rec:
+                    st.session_state.just_deleted = rec
+                    st.rerun()
+
 
     
     # Display drugs
@@ -137,6 +222,50 @@ with tab1:
                 rec = insert_drug(drug.strip())
                 if rec:
                     st.session_state.just_inserted = rec
+                    st.rerun()
+    
+    drugs = fetch_df('SELECT drug FROM drugs')
+    
+    # Update a ptm
+    st.markdown("### ✏️ Update")
+    if drugs.empty:
+        st.caption("Nothing to update.")
+    else:
+        drug_choices = {str(r.drug): f"{str(r.drug)}" for _, r in drugs.iterrows()}
+        sel_id = st.selectbox("drug", options=list(drug_choices.keys()), format_func=lambda k: drug_choices[k], key="upd_sel2")
+        current = drugs[drugs["drug"] == sel_id].iloc[0]
+
+        with st.form("update_form2", clear_on_submit=False):
+            c1, c2 = st.columns(2)
+            with c1:
+                new_name = st.text_input("drug", current["drug"])
+                
+            if st.form_submit_button("Update"):
+                rec = update_drug(str(current["drug"]), str(new_name))
+                if rec:
+                    st.session_state.just_updated = rec
+                    st.rerun()
+    
+    # Delete a drug
+    st.markdown("### 🗑️ Delete")
+    if drugs.empty:
+        st.caption("Nothing to delete.")
+    else:
+        drug_choices = {str(r.drug): f"{str(r.drug)})" for _, r in drugs.iterrows()}
+        colA, colB = st.columns([3, 2])
+        with colA:
+            del_id = st.selectbox("Select drug", options=list(drug_choices.keys()),
+                                  format_func=lambda k: drug_choices[k], key="del_sel2")
+        with colB:
+            confirm = st.checkbox("Confirm deletion", key="del_confirm2")
+
+        if st.button("Delete selected", key="del_drug"):
+            if not confirm:
+                st.warning("Please confirm before deleting.")
+            else:
+                rec = delete_drug(str(del_id))
+                if rec:
+                    st.session_state.just_deleted = rec
                     st.rerun()
 
     
