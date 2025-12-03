@@ -65,16 +65,26 @@ def fetch_df(sql: str, params: dict | None = None) -> pd.DataFrame:
     except Exception as e:
         st.error(f"DB error: {e}")
         return pd.DataFrame()
-
+    
 # SQL functions
-def insert_ptm(ptm: str, drug: str, reaction_score: int):
+def insert_ptm(ptm: str):
     sql = '''
-        INSERT INTO ptmdataset(ptm, drug, reaction_score)
-        VALUES (:n, :t, :s)
-        RETURNING ptm, drug, reaction_score AS ptm, drug, reaction_score
+        INSERT INTO ptms(ptm)
+        VALUES (:n)
+        RETURNING ptm AS ptm
     '''
     with engine.begin() as conn:
-        df = pd.read_sql(text(sql), conn, params={"n": ptm, "t": drug, "s": reaction_score})
+        df = pd.read_sql(text(sql), conn, params={"n": ptm})
+    return df.iloc[0].to_dict() if not df.empty else None
+    
+def insert_drug(drug: str):
+    sql = '''
+        INSERT INTO drugs(drug)
+        VALUES (:n)
+        RETURNING drug AS drug
+    '''
+    with engine.begin() as conn:
+        df = pd.read_sql(text(sql), conn, params={"n": drug})
     return df.iloc[0].to_dict() if not df.empty else None
 
 # --------------- UI ---------------
@@ -84,35 +94,63 @@ st.caption("Neon-ready: SSL on, statement_timeout set after connect, and fast-fa
 with st.sidebar:
     row_limit = st.number_input("Row limit", min_value=1, max_value=2000, value=200, step=50)
 
-tab1, tab2, tab3 = st.tabs(["🏚️ ptmdataset", "👹 ptm_correlation_matrix", "🔗 common_clusters"])
-
+tab1, tab2, tab3, tab4 = st.tabs(["🏚️ Input", "🏚️ ptmdataset", "👹 ptm_correlation_matrix", "🔗 common_clusters"])
 with tab1:
-    st.subheader("ptmdataset")
-    sql = "SELECT ptm, drug, reaction_score FROM ptmdataset ORDER BY ptm LIMIT :lim"
+    
+    # Display ptms
+    st.subheader("Input data")
+    sql = "SELECT ptm FROM ptms ORDER BY ptm"
     st.dataframe(fetch_df(sql, {"lim": int(row_limit)}), use_container_width=True)
     
-    st.markdown("### ➕ Insert")
+    # Insert a ptm
+    st.markdown("### ➕ Insert PTM")
     with st.form("insert_form", clear_on_submit=False):
         c1, c2 = st.columns(2)
         with c1:
             ptm = st.text_input("ptm*", placeholder="AARS ubi k474")
-            drug = st.text_input("drug", placeholder="H3122SEPTM_pTyr.PR2")
-            reaction_score = st.number_input("reaction_score", placeholder="0")
         if st.form_submit_button("Insert"):
-            if not ptm.strip() or not drug.strip():
-                st.warning("Please fill out all required fields!")        
+            if not ptm.strip():
+                st.warning("Cannot have a PTM name be empty!")        
             else:
-                rec = insert_ptm(ptm.strip(), drug.strip(), int(reaction_score))
+                rec = insert_ptm(ptm.strip())
+                if rec:
+                    st.session_state.just_inserted = rec
+                    st.rerun()
+                    
+    # Update a ptm
+
+    
+    # Display drugs
+    sql2 = "SELECT drug FROM drugs ORDER BY drug"
+    st.dataframe(fetch_df(sql2, {"lim": int(row_limit)}), use_container_width=True)
+    
+    # Insert a drug
+    st.markdown("### ➕ Insert DRUG")
+    with st.form("insert_form2", clear_on_submit=False):
+        c1, c2 = st.columns(2)
+        with c1:
+            drug = st.text_input("drug*", placeholder="H3122SEPTM_pTyr.PR2")
+        if st.form_submit_button("Insert"):
+            if not ptm.strip():
+                st.warning("Cannot have a drug name be empty!")        
+            else:
+                rec = insert_drug(drug.strip())
                 if rec:
                     st.session_state.just_inserted = rec
                     st.rerun()
 
+    
 with tab2:
+    st.subheader("ptmdataset")
+    sql = "SELECT ptm, drug, reaction_score FROM ptmdataset ORDER BY ptm LIMIT :lim"
+    st.dataframe(fetch_df(sql, {"lim": int(row_limit)}), use_container_width=True)
+
+with tab3:
     st.subheader("ptm_correlation_matrix")
     sql = 'SELECT ptm1, ptm2, spearman_score FROM ptm_correlation_matrix ORDER BY spearman_score LIMIT :lim'
     st.dataframe(fetch_df(sql, {"lim": int(row_limit)}), use_container_width=True)
 
-with tab3:
+with tab4:
     st.subheader("common_clusters")
     sql = "SELECT clusterid, ptmsincluster FROM common_clusters"
     st.dataframe(fetch_df(sql, {"lim": int(row_limit)}), use_container_width=True)
