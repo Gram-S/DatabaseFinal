@@ -1,0 +1,12 @@
+name: db_project
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pandas
+  - sqlalchemy
+  - streamlit
+  - psycopg2-binary
+  - pip
+  - pip:
+      - python-dotenv
