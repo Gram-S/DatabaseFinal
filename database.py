@@ -66,6 +66,17 @@ def fetch_df(sql: str, params: dict | None = None) -> pd.DataFrame:
         st.error(f"DB error: {e}")
         return pd.DataFrame()
 
+# SQL functions
+def insert_ptm(ptm: str, drug: str, reaction_score: int):
+    sql = '''
+        INSERT INTO ptmdataset(ptm, drug, reaction_score)
+        VALUES (:n, :t, :s)
+        RETURNING ptm, drug, reaction_score AS ptm, drug, reaction_score
+    '''
+    with engine.begin() as conn:
+        df = pd.read_sql(text(sql), conn, params={"n": ptm, "t": drug, "s": reaction_score})
+    return df.iloc[0].to_dict() if not df.empty else None
+
 # --------------- UI ---------------
 st.title("👻 PTMsToPathways DB Viewer")
 st.caption("Neon-ready: SSL on, statement_timeout set after connect, and fast-fail timeouts.")
@@ -79,6 +90,22 @@ with tab1:
     st.subheader("ptmdataset")
     sql = "SELECT ptm, drug, reaction_score FROM ptmdataset ORDER BY ptm LIMIT :lim"
     st.dataframe(fetch_df(sql, {"lim": int(row_limit)}), use_container_width=True)
+    
+    st.markdown("### ➕ Insert")
+    with st.form("insert_form", clear_on_submit=False):
+        c1, c2 = st.columns(2)
+        with c1:
+            ptm = st.text_input("ptm*", placeholder="AARS ubi k474")
+            drug = st.text_input("drug", placeholder="H3122SEPTM_pTyr.PR2")
+            reaction_score = st.number_input("reaction_score", placeholder="0")
+        if st.form_submit_button("Insert"):
+            if not ptm.strip() or not drug.strip():
+                st.warning("Please fill out all required fields!")        
+            else:
+                rec = insert_ptm(ptm.strip(), drug.strip(), int(reaction_score))
+                if rec:
+                    st.session_state.just_inserted = rec
+                    st.rerun()
 
 with tab2:
     st.subheader("ptm_correlation_matrix")
