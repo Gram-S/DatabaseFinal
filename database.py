@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+import numpy as np
 import streamlit as st
 from sqlalchemy import create_engine, text, event
 from sqlalchemy.engine import URL
@@ -129,6 +130,17 @@ def delete_drug(mid: str):
         df = pd.read_sql(text(sql), conn, params={"mid": str(mid)})
     return df.iloc[0].to_dict() if not df.empty else None
 
+def update_spearman(row: int, val: float):
+    sql = '''
+        UPDATE ptm_correlation_matrix
+        SET spearman_score = :v
+        WHERE id = :r
+        RETURNING spearman_score AS spearman_score
+    '''
+    with engine.begin() as conn:
+        df = pd.read_sql(text(sql), conn, params={"r": row, "v": val})
+    return df.iloc[0].to_dict() if not df.empty else None
+    
 # --------------- UI ---------------
 st.title("👻 PTMsToPathways DB Viewer")
 st.caption("Neon-ready: SSL on, statement_timeout set after connect, and fast-fail timeouts.")
@@ -136,7 +148,7 @@ st.caption("Neon-ready: SSL on, statement_timeout set after connect, and fast-fa
 with st.sidebar:
     row_limit = st.number_input("Row limit", min_value=1, max_value=2000, value=200, step=50)
 
-tab1, tab2, tab3, tab4 = st.tabs(["🏚️ Input", "🏚️ ptmdataset", "👹 ptm_correlation_matrix", "🔗 common_clusters"])
+tab1, tab2, tab3 = st.tabs(["🏚️ Input", "🏚️ Dataset", "🏚️ Correlation Matrix"])
 with tab1:
     
     # Display ptms
@@ -271,18 +283,50 @@ with tab1:
     
 with tab2:
     st.subheader("ptmdataset")
-    sql = "SELECT ptm, drug, reaction_score FROM ptmdataset ORDER BY ptm LIMIT :lim"
+    
+    # Create the dataset
+    sql = '''
+    DROP TABLE PTMdataset; 
+    CREATE TABLE PTMdataset AS SELECT ptm, drug FROM ptms CROSS JOIN drugs ORDER BY ptms;
+    ALTER TABLE PTMdataset ADD COLUMN reaction_score FLOAT; 
+    UPDATE PTMdataset SET reaction_score = random(); 
+    SELECT ptm, drug, reaction_score FROM ptmdataset;
+    '''
     st.dataframe(fetch_df(sql, {"lim": int(row_limit)}), use_container_width=True)
-
+    
 with tab3:
-    st.subheader("ptm_correlation_matrix")
-    sql = 'SELECT ptm1, ptm2, spearman_score FROM ptm_correlation_matrix ORDER BY spearman_score LIMIT :lim'
+    st.subheader("correlation matrix")
+    
+    PTMdataset = fetch_df('''SELECT DISTINCT ptm FROM PTMdataset''')
+    reaction_score = fetch_df("SELECT ptm, SUM(reaction_score) FROM PTMdataset GROUP BY ptm") # Holds reaction scores
+    
+    ptm1 = list()
+    ptm2 = list()
+    spearman_score = list()
+    
+    print(reaction_score)
+    
+    for i in range(0, len(reaction_score)):
+        for j in range(0, len(reaction_score)):
+            p1 = reaction_score.iloc[i, 0]
+            p2 = reaction_score.iloc[j, 0]
+            
+            s1 = float(reaction_score.iloc[i, 1])
+            s2 = float(reaction_score.iloc[j, 1])
+            
+            ptm1.append(p1)
+            ptm2.append(p2)
+            spearman_score.append(min(s1, s2) / max(s1, s2))
+    
+    data = {'ptm1':ptm1, 'ptm2':ptm2,'spearman_score':spearman_score}
+    ptm_correlation_matrix = pd.DataFrame(data)
+    
+    with engine.connect() as conn:
+       ptm_correlation_matrix.to_sql('ptm_correlation_matrix', conn, if_exists='replace') 
+       
+    sql = '''SELECT ptm1, ptm2, spearman_score FROM ptm_correlation_matrix;'''
     st.dataframe(fetch_df(sql, {"lim": int(row_limit)}), use_container_width=True)
 
-with tab4:
-    st.subheader("common_clusters")
-    sql = "SELECT clusterid, ptmsincluster FROM common_clusters"
-    st.dataframe(fetch_df(sql, {"lim": int(row_limit)}), use_container_width=True)
 
 st.markdown("---")
 st.caption(f"Connecting to {PGHOST}:{PGPORT}/{PGDATABASE} as {PGUSER} (sslmode={PGSSLMODE}).")
