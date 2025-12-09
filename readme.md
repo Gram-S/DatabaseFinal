@@ -1,6 +1,4 @@
-
-Tutorial: 
--IF YOU ENCOUNTER ERRORS, sqlalchemy is really bad with functions like adding columns so, if the columns get messed up it will throw errors. To fix drop everything and regenerate the dataset (run everyhting up until --gene_cccn_edges) using the commands found here: https://docs.google.com/document/d/1MwKjUs9-0x2uc3CU7pRgSiQOoIZFy-gew56n8cbKEtM/edit?usp=sharing. 
+P2Ppipeline(key).png is a figure that shows the full data structure flow for the original project, as well as gives some examples for the source data structures that I attempted to imitate in this project. 
 
 -Explanation: 
 A Post-Translational Modification (PTM) takes place inside cells after they create a protein. It is the modification of that protein that occurs after it is folded (as opposed to being modified during its creation or folding), such as lipoylation, the attachment of a C8 molecule to a protein (PTMs wikipedia). PTMs are more abstract than something physical like a cell, so instead, we look at how cells respond to some enviromental condition (called a drug in this project for simplicity) and measure if number of times the PTM is performed increases. Our goal is to find which PTMs have a similar reaction score, as we conclude that in response to a drug, which PTMs will or will not be performed. This gives us a better insight into how a drug modifies a persons proteome (ALL of the proteins in their body). We denote PTMs with similar reaction scores as "clustering" together. 
@@ -19,4 +17,6 @@ Now we want to find which pairs of PTMs share a similar reaction score. We do th
   Let r1 and r2 be a reaction score for ptm1 and ptm2 respectively
   Then the spearman score between ptm1 and ptm2 is: min(r1, r2) / max(r1, r2)
   
-This function has no mathmatical significance, but it perserves 3 traits from the dataset that would be created in the source material. A ptm pair that contains 2 of the same ptm has a score of 1, its bounds from 0 to 1, as well as shrinking depending on much larger one number is compared to the other. 
+This function has no mathmatical significance, but it perserves 2 traits from the dataset that would be created in the source material other than the bounds (0 to 1) and distance traits (bigger distance = smaller) as stated above.
+- A ptm pair that contains 2 of the same ptm has a score of 1.
+- PTM1 and PTM2 have the same spearman score as PTM2 and PTM1 (order doesn't matter). This is because they originally come from a symmetrical matrix (can be viewed on the P2Ppipeline(key).png figure). 
