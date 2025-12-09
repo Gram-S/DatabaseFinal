@@ -1,6 +1,6 @@
 import os
+import random 
 import pandas as pd
-import numpy as np
 import streamlit as st
 from sqlalchemy import create_engine, text, event
 from sqlalchemy.engine import URL
@@ -284,14 +284,27 @@ with tab1:
 with tab2:
     st.subheader("ptmdataset")
     
-    # Create the dataset
-    sql = '''
-    DROP TABLE PTMdataset; 
-    CREATE TABLE PTMdataset AS SELECT ptm, drug FROM ptms CROSS JOIN drugs ORDER BY ptms;
-    ALTER TABLE PTMdataset ADD COLUMN reaction_score FLOAT; 
-    UPDATE PTMdataset SET reaction_score = random(); 
-    SELECT ptm, drug, reaction_score FROM ptmdataset;
-    '''
+    # Fetch ptms and drugs
+    ptms = fetch_df('SELECT DISTINCT ptm FROM ptms;') # I love sql used like this
+    drugs = fetch_df('SELECT DISTINCT drug FROM drugs;')
+    
+    ptms['key'] = 0 # Required for the cross join 
+    drugs['key'] = 0
+    ptmdataset = pd.merge(ptms, drugs, on='key') # Perform a cross join
+    
+    # Randomize the reaction score between every ptm and drug pair
+    reaction_score = list()
+    for r in range(0, len(ptmdataset)):
+        reaction_score.append(random.uniform(0,10))
+    
+    ptmdataset['reaction_score'] = reaction_score
+    
+    # THE BEST LINE OF CODE EVER WRITTEN - just transforms the data frame into psql database
+    with engine.connect() as conn:
+       ptmdataset.to_sql('ptmdataset', conn, if_exists='replace')
+    
+    
+    sql = '''SELECT ptm, drug, reaction_score FROM ptmdataset;'''
     st.dataframe(fetch_df(sql, {"lim": int(row_limit)}), use_container_width=True)
     
 with tab3:
@@ -304,9 +317,7 @@ with tab3:
     ptm2 = list()
     spearman_score = list()
     
-    print(reaction_score)
-    
-    for i in range(0, len(reaction_score)):
+    for i in range(0, len(reaction_score)): # For loop for creating the spearman score values
         for j in range(0, len(reaction_score)):
             p1 = reaction_score.iloc[i, 0]
             p2 = reaction_score.iloc[j, 0]
@@ -318,9 +329,10 @@ with tab3:
             ptm2.append(p2)
             spearman_score.append(min(s1, s2) / max(s1, s2))
     
-    data = {'ptm1':ptm1, 'ptm2':ptm2,'spearman_score':spearman_score}
-    ptm_correlation_matrix = pd.DataFrame(data)
+    data = {'ptm1':ptm1, 'ptm2':ptm2,'spearman_score':spearman_score} # Add them all to a new data frame
+    ptm_correlation_matrix = pd.DataFrame(data) 
     
+    # The best line of code ever written: Basically overwrites the database on the psql server
     with engine.connect() as conn:
        ptm_correlation_matrix.to_sql('ptm_correlation_matrix', conn, if_exists='replace') 
        
