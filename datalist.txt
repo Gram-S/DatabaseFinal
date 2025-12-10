@@ -1,0 +1,16 @@
+- Drugs (enviromental conditions)
+H3122SEPTM_pTyr.PR2
+H3122SEPTM_pTyr.PR3
+PC9SEPTM_pTyr.D1    
+PC9SEPTM_pTyr.D2    
+PC9SEPTM_pTyr.D3    
+PC9SEPTM_pTyr.E1    
+PC9SEPTM_pTyr.E2
+
+- PTMs
+RNPS1 p Y205
+PTPN6 p Y536              
+EIF2S1 p Y147             
+ACTG1 p T297 
+RACK1 p T229              
+EML4 p Y453
