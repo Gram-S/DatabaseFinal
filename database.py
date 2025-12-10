@@ -142,13 +142,13 @@ def update_spearman(row: int, val: float):
     return df.iloc[0].to_dict() if not df.empty else None
     
 # --------------- UI ---------------
-st.title("👻 PTMsToPathways DB Viewer")
+st.title("🌱 PTMsToPathways DB Viewer")
 st.caption("Neon-ready: SSL on, statement_timeout set after connect, and fast-fail timeouts.")
 
 with st.sidebar:
     row_limit = st.number_input("Row limit", min_value=1, max_value=2000, value=200, step=50)
 
-tab1, tab2, tab3 = st.tabs(["🏚️ Input", "🏚️ Dataset", "🏚️ Correlation Matrix"])
+tab1, tab2, tab3, tab4 = st.tabs(["➕ Input", "📓 Dataset", "↔️ Correlation Matrix", "👜 Clusters"])
 with tab1:
     
     # Display ptms
@@ -338,6 +338,44 @@ with tab3:
        
     sql = '''SELECT ptm1, ptm2, spearman_score FROM ptm_correlation_matrix;'''
     st.dataframe(fetch_df(sql, {"lim": int(row_limit)}), use_container_width=True)
+
+with tab4:
+    st.subheader("Common Clusters") 
+    
+    pdata = fetch_df('''SELECT ptm1, ptm2, spearman_score FROM ptm_correlation_matrix''') # fetch the data
+    
+    clusters = list() # initilize an empty list of clusters
+    
+    for i in range(0, len(pdata)):
+        s1 = pdata.iloc[i, 2]
+        temp = list() # Create a temporary list holding the ptm we are currently looking at
+        
+        for j in range(0, len(pdata)):
+            s2 = pdata.iloc[j, 2] 
+            
+            if abs(s1 - s2) < 0.5: # if the difference between the two scores is less than 0.5, then they cluster together, this will automatically add ptm i 
+                temp.append(pdata.iloc[j,1])
+        
+        # eliminate non-unique values from temp 
+        temp = list(set(temp))
+        if len(temp) > 1:
+            clusters.append(', '.join(temp))
+    
+    #eliminate non-unique values from common clusters
+    clusters = list(set(clusters))
+    data = {'clusters':clusters} # Add them all to a new dictonary
+    common_clusters = pd.DataFrame(data) 
+    
+    with engine.connect() as conn:
+       common_clusters.to_sql('common_clusters', conn, if_exists='replace') 
+    
+    sql = '''SELECT clusters FROM common_clusters;'''
+    st.dataframe(fetch_df(sql, {"lim": int(row_limit)}), use_container_width=True)
+    
+    if common_clusters.empty:
+        st.markdown("No Clusters found. Try rerunning?")
+    
+    
 
 
 st.markdown("---")
